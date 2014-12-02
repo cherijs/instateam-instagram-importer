@@ -27,6 +27,10 @@ add_action('icp_user_photos', 'icp_get_user_photos');
 add_action('icp_hashtag_photos', 'icp_get_hashtag_photos');
 add_action('icp_placeid_photos', 'icp_get_placeid_photos');
 
+//cherijs
+//add_action('init', 'icp_get_placeid_photos');
+
+
 function icp_activation() {
 	$settings = get_option( "icp_settings" );
 
@@ -39,6 +43,8 @@ function icp_activation() {
 	wp_schedule_event( current_time( 'timestamp' ), $cron_time, 'icp_user_photos');
 	wp_schedule_event( current_time( 'timestamp' ), $cron_time, 'icp_hashtag_photos');
 	wp_schedule_event( current_time( 'timestamp' ), $cron_time, 'icp_placeid_photos');
+
+
 }
 
 register_deactivation_hook(__FILE__, 'icp_deactivation');
@@ -250,7 +256,7 @@ function icp_save_theme_settings() {
 
 
 function icp_admin_tabs( $current = 'homepage' ) { 
-    $tabs = array( 'homepage' => __('Hashtags & Users','insta_team') , 'post_type' => __('Import Options','insta_team'), 'shortcode'=> __('Shortcodes','insta_team'),  'unlink'=> __('Unlink Account','insta_team'), 'help' => __('Help','insta_team') ); 
+    $tabs = array( 'homepage' => __('Hashtags & Users','insta_team') , 'post_type' => __('Import Options','insta_team'), 'shortcode'=> __('Shortcodes','insta_team'),  'unlink'=> __('Unlink Account','insta_team'), 'help' => __('Help','insta_team') , 'reload' => __('Reload','insta_team')); 
     $links = array();
     echo '<h2 class="nav-tab-wrapper icpNavTab">';
     foreach( $tabs as $tab => $name ){
@@ -348,6 +354,18 @@ function icp_display_settings() {
 			endif;
 		?>
 		
+
+		<?php
+			if(isset($_GET['error'])):
+		?>
+			<div id="setting-error-settings_updated" class="updated settings-error"> 
+				<p><strong><?php _e('Error', 'insta_team' ); ?></strong></p>
+			</div>
+		<?php
+			endif;
+		?>
+
+
 		<?php
 			if (isset($_GET['updated']))
 			if ( 'true' == esc_attr( $_GET['updated'] ) ):
@@ -826,6 +844,19 @@ function icp_display_settings() {
 								
 							<?php
 							break;
+
+							case 'reload' : 
+								$no_save = true;
+
+								// echo "icp_get_placeid_photos";
+
+								icp_get_user_photos();
+								icp_get_hashtag_photos();
+								icp_get_placeid_photos();
+
+
+
+							break;
 						}
 						echo '</table>';
 					}
@@ -959,181 +990,27 @@ function icp_get_user_photos(){
     			endif;
 
     			$media = $instagram->getUserMedia($insta_user);
+    			if(@$media->error_message){
+					var_dump($media->error_message);
+					break;
+				} 
 		   		$next_id = '';
 
 		   		for($i=1; $i<=$page_num; $i++):
 
 		   			if($next_id===''): 
 		   				
-		   				foreach ($media->data as $data):
-		   					
-							$new_post = array();							
-			                $new_post["id"] = $data->id;		
-			               
-			                if($data->type === 'image'):
-
-				                $photo_desc = strtolower($data->caption->text);
-
-				                if(!empty($hashtags_per_user)):
-
-					                foreach($hashtags_per_user as $hashtag):
-					                	
-
-					                	$hashtag = '#'.strtolower($hashtag);
-
-					                	if (strpos($photo_desc, $hashtag) !== false):
-					                		
-											(string) $sql = "SELECT meta_id FROM ".$wpdb->postmeta." WHERE meta_value = '".$new_post["id"]."' AND meta_key = 'id'";
-
-											if($wpdb->get_var($sql) == NULL):
-												
-							                	$new_post["post_title"]  	= strip_tags($data->caption->text);
-							                	$new_post["post_content"]	= '<img src="'.$data->images->standard_resolution->url.'" />';
-							                	$new_post["post_type"]    	= $settings['icp_post_type'];
-								                $new_post["post_status"]    = $settings['icp_post_status'];
-
-							                	$post_id = wp_insert_post($new_post);
-
-							                	add_post_meta($post_id, $meta_key = "id", $meta_value=$new_post["id"], $unique=TRUE);
-							                	add_post_meta($post_id, 'instateam_created_time', $data->created_time, true);
-
-							                	if($upload_images==='yes'):
-							                		$photoURL = icp_upload_image($data->images->standard_resolution->url, $post_id);
-							                		if($photoURL!=='error'):
-							                			$post_update = array(
-														    'ID'           => $post_id,
-														    'post_content' => '<img src="'.$photoURL.'" />'
-														);
-														wp_update_post( $post_update );
-							                		endif;
-							                	endif;
-
-											endif;
-
-										endif;
-									endforeach;
-
-								else:
-
-				                	(string) $sql = "SELECT meta_id FROM ".$wpdb->postmeta." WHERE meta_value = '".$new_post["id"]."' AND meta_key = 'id'";
-
-									if($wpdb->get_var($sql) == NULL):
-										
-					                	$new_post["post_title"]  	= strip_tags($data->caption->text);
-					                	$new_post["post_content"]	= '<img src="'.$data->images->standard_resolution->url.'" />';
-					                	$new_post["post_type"]    	= $settings['icp_post_type'];
-						                $new_post["post_status"]    = $settings['icp_post_status'];
-
-					                	$post_id = wp_insert_post($new_post);
-
-					                	add_post_meta($post_id, $meta_key = "id", $meta_value=$new_post["id"], $unique=TRUE);
-					                	add_post_meta($post_id, 'instateam_created_time', $data->created_time, true);
-
-					                	if($upload_images==='yes'):
-					                		$photoURL = icp_upload_image($data->images->standard_resolution->url, $post_id);
-					                		if($photoURL!=='error'):
-					                			$post_update = array(
-												    'ID'           => $post_id,
-												    'post_content' => '<img src="'.$photoURL.'" />'
-												);
-												wp_update_post( $post_update );
-					                		endif;
-					                	endif;
-
-									endif;
-								
-								endif;
-
-							endif;
-		               
-			            endforeach;
+		   				check_picture($media,$hashtags_per_user);
 
 		   			else: 
 
     					$media = $instagram->pagination($media);
-
-						foreach ($media->data as $data):
-							
-							$new_post = array();							
-			                $new_post["id"]     		= $data->id;	
-			                
-			                if($data->type === 'image'):		            	
-
-				                $photo_desc = strtolower($data->caption->text);
-
-				                if(!empty($hashtags_per_user)):
-
-					                foreach($hashtags_per_user as $hashtag):
-					                	$hashtag = '#'.strtolower($hashtag);
-
-					                	$hashtag_photo_counter++;
-					                	
-					                	if (strpos($photo_desc, $hashtag) !== false):
-									    	
-											(string) $sql = "SELECT meta_id FROM ".$wpdb->postmeta." WHERE meta_value = '".$new_post["id"]."' AND meta_key = 'id'";
-
-											if($wpdb->get_var($sql) == NULL):
-
-							                	$new_post["post_title"]  	= strip_tags($data->caption->text);
-							                	$new_post["post_content"]	= '<img src="'.$data->images->standard_resolution->url.'" />';
-							                	$new_post["post_type"]    	= $settings['icp_post_type'];
-								                $new_post["post_status"]    = $settings['icp_post_status'];
-
-							                	$post_id = wp_insert_post($new_post);
-
-							                	add_post_meta($post_id, $meta_key = "id", $meta_value=$new_post["id"], $unique=TRUE);
-							                	add_post_meta($post_id, 'instateam_created_time', $data->created_time, true);
-
-							                	if($upload_images==='yes'):
-							                		$photoURL = icp_upload_image($data->images->standard_resolution->url, $post_id);
-							                		if($photoURL!=='error'):
-							                			$post_update = array(
-														    'ID'           => $post_id,
-														    'post_content' => '<img src="'.$photoURL.'" />'
-														);
-														wp_update_post( $post_update );
-							                		endif;
-							                	endif;
-
-											endif;
-
-										endif;
-									endforeach;
-
-								else:
-
-				                	(string) $sql = "SELECT meta_id FROM ".$wpdb->postmeta." WHERE meta_value = '".$new_post["id"]."' AND meta_key = 'id'";
-
-									if($wpdb->get_var($sql) == NULL):
-
-					                	$new_post["post_title"]  	= strip_tags($data->caption->text);
-					                	$new_post["post_content"]	= '<img src="'.$data->images->standard_resolution->url.'" />';
-					                	$new_post["post_type"]    	= $settings['icp_post_type'];
-						                $new_post["post_status"]    = $settings['icp_post_status'];
-
-					                	$post_id = wp_insert_post($new_post);
-
-					                	add_post_meta($post_id, $meta_key = "id", $meta_value=$new_post["id"], $unique=TRUE);
-					                	add_post_meta($post_id, 'instateam_created_time', $data->created_time, true);
-
-					                	if($upload_images==='yes'):
-					                		$photoURL = icp_upload_image($data->images->standard_resolution->url, $post_id);
-					                		if($photoURL!=='error'):
-					                			$post_update = array(
-												    'ID'           => $post_id,
-												    'post_content' => '<img src="'.$photoURL.'" />'
-												);
-												wp_update_post( $post_update );
-					                		endif;
-					                	endif;
-
-									endif;
-								
-								endif;
-							
-							endif;
-		               
-			            endforeach;
+	    				if(@$media->error_message){
+							var_dump($media->error_message);
+							break;
+						} else {
+							check_picture($media,$hashtags_per_user);
+						} 
 
 		   			endif;
 
@@ -1183,90 +1060,25 @@ function icp_get_hashtag_photos(){
     			endif;
     			
     			$media = $instagram->getTagMedia($hashtag);
+    			if(@$media->error_message){
+					var_dump($media->error_message);
+					break;
+				} 
 		   		$next_id = '';
 
 		   		for($i=1; $i<=$page_num; $i++):
 
 		   			if($next_id===''): 
-
-		   				foreach ($media->data as $data):
-
-							$new_post = array();							
-			                $new_post["id"]     		= $data->id;			    
-			                
-			                if($data->type === 'image'):
-
-			                	(string) $sql = "SELECT meta_id FROM ".$wpdb->postmeta." WHERE meta_value = '".$new_post["id"]."' AND meta_key = 'id'";
-
-								if($wpdb->get_var($sql) == NULL):
-
-				                	$new_post["post_title"]  	= strip_tags($data->caption->text);
-				                	$new_post["post_content"]	= '<img src="'.$data->images->standard_resolution->url.'" />';
-				                	$new_post["post_type"]    	= $settings['icp_post_type'];
-					                $new_post["post_status"]    = $settings['icp_post_status'];
-
-				                	$post_id = wp_insert_post($new_post);
-
-				                	add_post_meta($post_id, $meta_key = "id", $meta_value=$new_post["id"], $unique=TRUE);
-				                	add_post_meta($post_id, 'instateam_created_time', $data->created_time, true);
-
-				                	if($upload_images==='yes'):
-				                		$photoURL = icp_upload_image($data->images->standard_resolution->url, $post_id);
-				                		if($photoURL!=='error'):
-				                			$post_update = array(
-											    'ID'           => $post_id,
-											    'post_content' => '<img src="'.$photoURL.'" />'
-											);
-											wp_update_post( $post_update );
-				                		endif;
-				                	endif;
-
-								endif;
-
-							endif;
-		               
-			            endforeach;
+						check_picture($media,NULL);
 		   			else: 
 
     					$media = $instagram->pagination($media);
-
-						foreach ($media->data as $data):
-
-							$new_post = array();							
-			                $new_post["id"]     		= $data->id;	
-			                
-			                if($data->type === 'image'):		            	
-
-				                (string) $sql = "SELECT meta_id FROM ".$wpdb->postmeta." WHERE meta_value = '".$new_post["id"]."' AND meta_key = 'id'";
-
-								if($wpdb->get_var($sql) == NULL):
-
-				                	$new_post["post_title"]  	= strip_tags($data->caption->text);
-				                	$new_post["post_content"]	= $data->images->standard_resolution->url;
-				                	$new_post["post_type"]    	= $settings['icp_post_type'];
-					                $new_post["post_status"]    = $settings['icp_post_status'];
-
-				                	$post_id = wp_insert_post($new_post);
-
-				                	add_post_meta($post_id, $meta_key = "id", $meta_value=$new_post["id"], $unique=TRUE);
-				                	add_post_meta($post_id, 'instateam_created_time', $data->created_time, true);
-
-				                	if($upload_images==='yes'):
-				                		$photoURL = icp_upload_image($data->images->standard_resolution->url, $post_id);
-				                		if($photoURL!=='error'):
-				                			$post_update = array(
-											    'ID'           => $post_id,
-											    'post_content' => '<img src="'.$photoURL.'" />'
-											);
-											wp_update_post( $post_update );
-				                		endif;
-				                	endif;
-
-								endif;
-							
-							endif;
-		               
-			            endforeach;
+		    			if(@$media->error_message){
+							var_dump($media->error_message);
+							break;
+						} else {
+							check_picture($media,NULL);
+						}
 
 		   			endif;
 
@@ -1305,97 +1117,38 @@ function icp_get_placeid_photos(){
     	if( !empty ( $placeids ) ) :
 
     		$counter = 0;
+
+
     		foreach( $placeids as $placeid ) : 
 
     			if(empty($placeid)):
     				break;
     			endif;
-    			
+
+
     			$media = $instagram->getLocationMedia($placeid);
+    			if(@$media->error_message){
+					var_dump($media->error_message);
+					break;
+				} 
+
+
+
+
 		   		$next_id = '';
 
 		   		for($i=1; $i<=$page_num; $i++):
 
 		   			if($next_id===''): 
-
-		   				foreach ($media->data as $data):
-
-							$new_post = array();							
-			                $new_post["id"]     		= $data->id;			    
-			                
-			                if($data->type === 'image'):
-
-			                	(string) $sql = "SELECT meta_id FROM ".$wpdb->postmeta." WHERE meta_value = '".$new_post["id"]."' AND meta_key = 'id'";
-
-								if($wpdb->get_var($sql) == NULL):
-
-				                	$new_post["post_title"]  	= strip_tags($data->caption->text);
-				                	$new_post["post_content"]	= '<img src="'.$data->images->standard_resolution->url.'" />';
-				                	$new_post["post_type"]    	= $settings['icp_post_type'];
-					                $new_post["post_status"]    = $settings['icp_post_status'];
-
-				                	$post_id = wp_insert_post($new_post);
-
-				                	add_post_meta($post_id, $meta_key = "id", $meta_value=$new_post["id"], $unique=TRUE);
-				                	add_post_meta($post_id, 'instateam_created_time', $data->created_time, true);
-
-				                	if($upload_images==='yes'):
-				                		$photoURL = icp_upload_image($data->images->standard_resolution->url, $post_id);
-				                		if($photoURL!=='error'):
-				                			$post_update = array(
-											    'ID'           => $post_id,
-											    'post_content' => '<img src="'.$photoURL.'" />'
-											);
-											wp_update_post( $post_update );
-				                		endif;
-				                	endif;
-
-								endif;
-
-							endif;
-		               
-			            endforeach;
+						check_picture($media,NULL);
 		   			else: 
-
     					$media = $instagram->pagination($media);
-
-						foreach ($media->data as $data):
-
-							$new_post = array();							
-			                $new_post["id"]     		= $data->id;	
-			                
-			                if($data->type === 'image'):		            	
-
-				                (string) $sql = "SELECT meta_id FROM ".$wpdb->postmeta." WHERE meta_value = '".$new_post["id"]."' AND meta_key = 'id'";
-
-								if($wpdb->get_var($sql) == NULL):
-
-				                	$new_post["post_title"]  	= strip_tags($data->caption->text);
-				                	$new_post["post_content"]	= $data->images->standard_resolution->url;
-				                	$new_post["post_type"]    	= $settings['icp_post_type'];
-					                $new_post["post_status"]    = $settings['icp_post_status'];
-
-				                	$post_id = wp_insert_post($new_post);
-
-				                	add_post_meta($post_id, $meta_key = "id", $meta_value=$new_post["id"], $unique=TRUE);
-				                	add_post_meta($post_id, 'instateam_created_time', $data->created_time, true);
-
-				                	if($upload_images==='yes'):
-				                		$photoURL = icp_upload_image($data->images->standard_resolution->url, $post_id);
-				                		if($photoURL!=='error'):
-				                			$post_update = array(
-											    'ID'           => $post_id,
-											    'post_content' => '<img src="'.$photoURL.'" />'
-											);
-											wp_update_post( $post_update );
-				                		endif;
-				                	endif;
-
-								endif;
-							
-							endif;
-		               
-			            endforeach;
+		    			if(@$media->error_message){
+							var_dump($media->error_message);
+							break;
+						} else {
+							check_picture($media,NULL);
+						}
 
 		   			endif;
 
@@ -1414,8 +1167,152 @@ function icp_get_placeid_photos(){
 	endif;
 
 }
+function insert_picture($data) {
+	global $wpdb;
+	global $post;
 
-function icp_upload_image($url, $post_id){
+	$settings = get_option('icp_settings');
+	$upload_images = $settings['icp_featured_image'];
+	$media_type = $data->type;
+
+	if ($data->caption) {
+		$text = $data->caption->text;
+	}
+
+	$text = wp_strip_all_tags(@$data->caption->text);
+	$title = mb_strimwidth($text, 0, 30, '', 'utf-8');
+	$type = 'instagram';
+	$lat = 'null';
+	$lng = 'null';
+	$location_name = NULL;
+	$picid = $data->id;
+	$orig_date = $data->created_time;
+	$user = $data->user->username;
+	$user_fullname = $data->user->full_name;
+	$user_picture = $data->user->profile_picture;
+	$video_url = 'null';
+	$img_url = $data->link;
+
+	if ($media_type == 'video') {
+		$video_url = $data->videos->standard_resolution->url;
+	}
+	if ($data->location) {
+		if (isset($data->location->name) && $data->location->name) {
+			$location_name = $data->location->name;
+		}
+		$lat = $data->location->latitude;
+		$lng = $data->location->longitude;
+	}
+	$tags = '';
+	if ($data->tags) {
+		foreach($data->tags as $tag) {
+			if ($tags == '') {
+				$tags = $tag;
+			}
+			else {
+				$tags.= ' ,' . $tag;
+			}
+		}
+	}
+	if (!$text) {
+		if ($location_name) {
+			$title = $location_name;
+		}
+		else {
+			$title = 'no title';
+		}
+	}
+
+	$new_post = array(
+		'comment_status' => 'closed',
+		'ping_status' => 'closed',
+		'post_author' => 1,
+		'post_content' => $text,
+		'post_date' => date_i18n('Y-m-d H:i:s', $orig_date) , //[ Y-m-d H:i:s ] //The time post was made.
+		'post_date_gmt' => date('Y-m-d H:i:s', $orig_date) , //[ Y-m-d H:i:s ] //The time post was made, in GMT.
+		'post_status' => $settings['icp_post_status'],
+		'post_title' => $title,
+		'post_type' => $settings['icp_post_type'],
+		'tags_input' => $tags,
+	);
+	$post_id = wp_insert_post($new_post);
+	update_post_meta($post_id, 'img_url', $img_url);
+	update_post_meta($post_id, 'type', $type);
+	update_post_meta($post_id, 'picid', $picid);
+	update_post_meta($post_id, 'orig_date', $orig_date);
+	update_post_meta($post_id, 'lat', $lat);
+	update_post_meta($post_id, 'lng', $lng);
+	update_post_meta($post_id, 'user', $user);
+	update_post_meta($post_id, 'user_fullname', $user_fullname);
+	update_post_meta($post_id, 'user_picture', $user_picture);
+	update_post_meta($post_id, 'location_name', $location_name);
+	update_post_meta($post_id, 'media_type', $media_type);
+	update_post_meta($post_id, 'video_url', $video_url);
+
+	if ($upload_images === 'yes'):
+		$photoURL = icp_upload_image($data->images->standard_resolution->url, $post_id, $title);
+		if ($photoURL !== 'error'):
+			// $post_update = array(
+			//     'ID'           => $post_id,
+			//     'post_content' => '<img src="'.$photoURL.'" />'
+			// );
+			// wp_update_post( $post_update );
+		endif;
+	endif;
+
+	if ( isset ( $_GET['tab'] ) &&$_GET['tab']=="reload") {
+		echo '<img src="' . $data->images->thumbnail->url . '" />';
+	}
+	
+}
+
+
+function check_picture($media,$hashtags_per_user){
+
+
+	global $wpdb;
+	global $post;
+
+
+
+	foreach ($media->data as $data):
+		
+		$media_type = $data->type;
+        if($media_type === 'image' || $media_type === 'video' ):		            	
+
+            $photo_desc = strtolower(@$data->caption->text);
+
+            if(!empty($hashtags_per_user)):
+
+                foreach($hashtags_per_user as $hashtag):
+                	$hashtag = '#'.strtolower($hashtag);
+                	
+                	if (strpos($photo_desc, $hashtag) !== false):
+						(string) $sql = "SELECT meta_id FROM ".$wpdb->postmeta." WHERE meta_value = '".$data->id."' AND meta_key = 'picid'";
+						if($wpdb->get_var($sql) == NULL):
+							insert_picture($data);
+						endif;
+
+					endif;
+				endforeach;
+
+			else:
+						(string) $sql = "SELECT meta_id FROM ".$wpdb->postmeta." WHERE meta_value = '".$data->id."' AND meta_key = 'picid'";
+						if($wpdb->get_var($sql) == NULL):
+							insert_picture($data);
+						endif;
+
+			endif;
+		
+		endif;
+   
+    endforeach;
+
+}
+
+
+
+function icp_upload_image($url, $post_id, $title){
 
 	require_once (ABSPATH.'/wp-admin/includes/file.php');
 	require_once (ABSPATH.'/wp-admin/includes/media.php');
@@ -1434,7 +1331,7 @@ function icp_upload_image($url, $post_id){
 			return 'error';
 		endif;
 
-		$photo_id = media_handle_sideload( $file_array, $post_id, '' );
+		$photo_id = media_handle_sideload( $file_array, $post_id,  $title );
 
 		if (is_wp_error($photo_id)):
 			@unlink($file_array['tmp_name']);
@@ -1540,7 +1437,8 @@ function icp_photo_post_type_init() {
 			'has_archive' => 'wpteam_instagram_photos',
 			'capability_type' => 'post',
 			'hierarchical' => false,
-			'supports' => array( 'title', 'editor', 'thumbnail' )
+			'taxonomies' => array('post_tag'),
+			'supports' => array( 'title', 'editor', 'thumbnail' ) //,'custom-fields'
 		) 
 	); 
 
